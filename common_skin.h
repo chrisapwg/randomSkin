@@ -31,6 +31,19 @@
 
 class common_Function : public MPxCommand {
 public:
+	int getDecimal(double prune) {
+		if (prune > 0.1) {
+			return 2;
+		}
+		else if (prune > 0.01) {
+			return 3;
+		}
+		else if (prune > 0.001) {
+			return 4;
+		}
+		return 5;
+	}
+
 	void printMIntArray(const MString& arrayName, const MIntArray& arrayData) {
 		MString outputString = "-List '" + arrayName + "' = [";
 		for (unsigned int i = 0; i < arrayData.length(); ++i) {
@@ -45,14 +58,17 @@ public:
 
 	void printMDoubleArray(const MString& arrayName, const MDoubleArray& arrayData) {
 		MString outputString = "-List '" + arrayName + "' = [";
+		float total = 0;
 		for (unsigned int i = 0; i < arrayData.length(); ++i) {
 			outputString += MString() + arrayData[i];
+			total += arrayData[i];
 			if (i < arrayData.length() - 1) {
 				outputString += ", ";
 			}
 		}
 		outputString += "]";
 		MGlobal::displayInfo(outputString);
+		MGlobal::displayInfo(MString("The total sum = ") + total);
 	}
 
 	void printMFloatArray(const MString& arrayName, const MFloatArray& arrayData) {
@@ -127,24 +143,26 @@ public:
 		}
 
 		// ----- Step 2: Limit max influences -----
-		std::vector<double> weightVector(prunedWeights.begin(), prunedWeights.end());
+		if (maxInfluence != 99) {
+			std::vector<double> weightVector(prunedWeights.begin(), prunedWeights.end());
 
-		while (std::count_if(weightVector.begin(), weightVector.end(), [&](double w) { return w > 0.0; }) > maxInfluence) {
-			double minWeight = std::numeric_limits<double>::max();
-			unsigned int minIndex = -1;
+			while (std::count_if(weightVector.begin(), weightVector.end(), [&](double w) { return w > 0.0; }) > maxInfluence) {
+				double minWeight = std::numeric_limits<double>::max();
+				unsigned int minIndex = -1;
 
-			for (unsigned int i = 0; i < weightVector.size(); ++i) {
-				if (!lockedJoints[i]) {
-					if (weightVector[i] > 0.0 && weightVector[i] < minWeight) {
-						minWeight = weightVector[i];
-						minIndex = i;
+				for (unsigned int i = 0; i < weightVector.size(); ++i) {
+					if (!lockedJoints[i]) {
+						if (weightVector[i] > 0.0 && weightVector[i] < minWeight) {
+							minWeight = weightVector[i];
+							minIndex = i;
+						}
 					}
 				}
-			}
 
-			if (minIndex != -1) {
-				prunedWeights[minIndex] = 0.0;
-				weightVector[minIndex] = 0.0;
+				if (minIndex != -1) {
+					prunedWeights[minIndex] = 0.0;
+					weightVector[minIndex] = 0.0;
+				}
 			}
 		}
 

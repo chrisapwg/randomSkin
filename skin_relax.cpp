@@ -81,6 +81,7 @@ MStatus relaxSkin::doIt(const MArgList& args) {
 	_mLoop = _mArgData_syntax.flagArgumentInt(_flagLoop[0], 0);
 	_mInfluence = _mArgData_syntax.flagArgumentInt(_flagInfluence[0], 0);
 	_mPrune = _mArgData_syntax.flagArgumentDouble(_flagPrune[0], 0);
+	int _mDecimal = fuck.getDecimal(_mPrune);
 
 	// ============================================== //
 	// ============================================== //
@@ -288,7 +289,7 @@ MStatus relaxSkin::doIt(const MArgList& args) {
 		// ============================================== //
 		// ============================================== //
 
-		fuck.normalizeWeights(_mDouble_weightFinal_data, _bool_lockedJoints, 1e-6, 5, _mPrune, _mInfluence);
+		fuck.normalizeWeights(_mDouble_weightFinal_data, _bool_lockedJoints, 1e-6, _mDecimal, _mPrune, _mInfluence);
 
 		// ============================================== //
 		// ============================================== //

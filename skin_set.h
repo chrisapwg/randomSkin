@@ -29,10 +29,10 @@
 #include <maya/MItMeshPolygon.h>
 #include <maya/MItMeshEdge.h>
 
-class scaleSkin : public MPxCommand {
+class setSkin : public MPxCommand {
 public: // Public so can used in main.cpp
-	scaleSkin();
-	virtual ~scaleSkin();
+	setSkin();
+	virtual ~setSkin();
 	virtual MStatus doIt(const MArgList& args) override;
 	virtual MStatus redoIt() override;
 	virtual MStatus undoIt() override;

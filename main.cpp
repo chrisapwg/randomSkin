@@ -8,6 +8,11 @@
 #include "skin_relax.h"
 #include "skin_sharper.h"
 #include "skin_add.h"
+#include "skin_scale.h"
+#include "skin_set.h"
+#include "skin_export.h"
+#include "skin_import.h"
+#include "skin_copy.h"
 
 MStatus initializePlugin(MObject pluginObj)
 {
@@ -30,6 +35,11 @@ MStatus initializePlugin(MObject pluginObj)
 	status = pluginFn.registerCommand(relaxSkin::commandName(), relaxSkin::creator, relaxSkin::commandSyntax);
 	status = pluginFn.registerCommand(sharperSkin::commandName(), sharperSkin::creator, sharperSkin::commandSyntax);
 	status = pluginFn.registerCommand(addSkin::commandName(), addSkin::creator, addSkin::commandSyntax);
+	status = pluginFn.registerCommand(scaleSkin::commandName(), scaleSkin::creator, scaleSkin::commandSyntax);
+	status = pluginFn.registerCommand(setSkin::commandName(), setSkin::creator, setSkin::commandSyntax);
+	status = pluginFn.registerCommand(exportSkin::commandName(), exportSkin::creator, exportSkin::commandSyntax);
+	status = pluginFn.registerCommand(importSkin::commandName(), importSkin::creator, importSkin::commandSyntax);
+	status = pluginFn.registerCommand(copySkin::commandName(), copySkin::creator, copySkin::commandSyntax);
 
 	/*
 	status = pluginFn.registerCommand(helloWorldCMD::commandName(), helloWorldCMD::creator); // using () mean is operating and return something, if def with () mean just give the function adress
@@ -83,23 +93,13 @@ MStatus uninitializePlugin(MObject pluginObj)
 	MFnPlugin pluginFn(pluginObj);
 
 	status = pluginFn.deregisterCommand(relaxSkin::commandName());
-	if (!status)
-	{
-		MGlobal::displayInfo("Failed to deregister command: " + relaxSkin::commandName());
-		return (status);
-	}
 	status = pluginFn.deregisterCommand(sharperSkin::commandName());
-	if (!status)
-	{
-		MGlobal::displayInfo("Failed to deregister command: " + sharperSkin::commandName());
-		return (status);
-	}
 	status = pluginFn.deregisterCommand(addSkin::commandName());
-	if (!status)
-	{
-		MGlobal::displayInfo("Failed to deregister command: " + addSkin::commandName());
-		return (status);
-	}
+	status = pluginFn.deregisterCommand(scaleSkin::commandName());
+	status = pluginFn.deregisterCommand(setSkin::commandName());
+	status = pluginFn.deregisterCommand(exportSkin::commandName());
+	status = pluginFn.deregisterCommand(importSkin::commandName());
+	status = pluginFn.deregisterCommand(copySkin::commandName());
 	/*
 	status = pluginFn.deregisterCommand(helloWorldCMD::commandName());
 	if (!status)

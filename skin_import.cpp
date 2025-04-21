@@ -1,23 +1,17 @@
-#include "skin_sharper.h"
+#include "skin_import.h"
 #include "common_skin.h"
 
 // ============================================== //
 // Flag Statement
 // ============================================== //
 
-static const MString _commandName = "sharperSkin";
-static const char* _flagValue[2] = { "-v", "-value" };
-static const char* _flagLoop[2] = { "-l", "-loop" };
-static const char* _flagInfluence[2] = { "-im", "-influenceMax" };
+static const MString _commandName = "importSkin";
 static const char* _flagPrune[2] = { "-p", "-prune" };
 
-MSyntax sharperSkin::commandSyntax() {
+MSyntax importSkin::commandSyntax() {
 	MSyntax syntax;
 	syntax.setObjectType(MSyntax::kSelectionList, 0);
 	syntax.useSelectionAsDefault(false);
-	syntax.addFlag(_flagValue[0], _flagValue[1], MSyntax::kDouble);
-	syntax.addFlag(_flagLoop[0], _flagLoop[1], MSyntax::kLong);
-	syntax.addFlag(_flagInfluence[0], _flagInfluence[1], MSyntax::kLong);
 	syntax.addFlag(_flagPrune[0], _flagPrune[1], MSyntax::kDouble);
 	return (syntax);
 }
@@ -26,29 +20,26 @@ MSyntax sharperSkin::commandSyntax() {
 // Common Statement
 // ============================================== //
 
-sharperSkin::sharperSkin() : // Set default value, similar like python def(args, args, args):
+importSkin::importSkin() : // Set default value, similar like python def(args, args, args):
 	MPxCommand(),
 	_mIsUndoable(true),
-	_mValue(0.2),
-	_mLoop(5),
-	_mInfluence(8),
 	_mPrune(0.0001)
 {
 }
 
-sharperSkin::~sharperSkin()
+importSkin::~importSkin()
 {
 }
 
-bool sharperSkin::isUndoable() const {
+bool importSkin::isUndoable() const {
 	return (_mIsUndoable);
 }
 
-void* sharperSkin::creator() {
-	return (new sharperSkin());
+void* importSkin::creator() {
+	return (new importSkin());
 }
 
-MString sharperSkin::commandName() {
+MString importSkin::commandName() {
 	return (_commandName);
 }
 
@@ -56,7 +47,7 @@ MString sharperSkin::commandName() {
 // The Method
 // ============================================== //
 
-MStatus sharperSkin::doIt(const MArgList& args) {
+MStatus importSkin::doIt(const MArgList& args) {
 	// ============================================== //
 	// ============================================== //
 	// ============================================== //
@@ -77,11 +68,15 @@ MStatus sharperSkin::doIt(const MArgList& args) {
 
 	// ----- Get Flag Data -----
 
-	_mValue = _mArgData_syntax.flagArgumentDouble(_flagValue[0], 0);
-	_mLoop = _mArgData_syntax.flagArgumentInt(_flagLoop[0], 0);
-	_mInfluence = _mArgData_syntax.flagArgumentInt(_flagInfluence[0], 0);
 	_mPrune = _mArgData_syntax.flagArgumentDouble(_flagPrune[0], 0);
 	int _mDecimal = fuck.getDecimal(_mPrune);
+
+	MString _mString_jointListStr;
+	MStringArray _mStringArray_jointNames;
+	MStringArray _mString_split;
+
+	_mString_jointListStr.split(',', _mString_split);
+	_mStringArray_jointNames = _mString_split;
 
 	// ============================================== //
 	// ============================================== //
@@ -129,6 +124,8 @@ MStatus sharperSkin::doIt(const MArgList& args) {
 		_bool_lockedJoints[i] = _plug.asBool();
 	}
 
+	// ----- Default Indicate -----
+
 	for (unsigned int p = 0; p < _int_jointLength; ++p) {
 		_mInt_jointIndex.append(p);										// Add the index of influence to the list
 	}
@@ -158,148 +155,71 @@ MStatus sharperSkin::doIt(const MArgList& args) {
 	// ============================================== //
 	// ============================================== //
 	// ============================================== //
-	// Step 03 - Get Array Data for Calculation
+	// Step 02 - Return
 	// ============================================== //
 	// ============================================== //
 	// ============================================== //
 
-	// ----- Looping per Selected Vertex List -----
 
-	for (unsigned int a = 0; a < _mInt_vertexIndices_all.length(); ++a) {
 
-		// ----- Reset Data -----
 
-		MDoubleArray _mDouble_weightIndex;
 
-		// ============================================== //
-		// ============================================== //
-		// ============================================== //
-		// Step 04 - Get Basic Index and Neighbor Data
-		// ============================================== //
-		// ============================================== //
-		// ============================================== //
+	// Your mesh name, example "pCylinder1"
+	std::string meshName = "Fatalis_Closemouth_UDIMs";
 
-		// ----- Find index weight -----
-
-		for (unsigned int z = 0; z < _int_jointLength; ++z) {
-			_mDouble_weightIndex.append(_mDouble_weightData_allSelected[a * _int_jointLength + z]);
-		}
-
-		// ----- Calculating for Locked Joint -----
-
-		double _lockedSum = 0.0;
-
-		for (unsigned int i = 0; i < _int_jointLength; ++i) {
-			if (_bool_lockedJoints[i]) {
-				_lockedSum += _mDouble_weightIndex[i];
-			}
-		}
-
-		double _lockedPercent = 1.0 - _lockedSum;
-
-		if (_mValue != 0.0 && _lockedPercent != 0.0) {
-
-			unsigned int _int_maxIndex = 0;
-			unsigned int _int_minIndex = 0;
-			double _double_maxWeight_data = 0;
-			double _double_minWeight_data = 0;
-			double _double_maxWeight_new;
-			double _double_minWeight_new;
-			double _double_otherWeight_data = 0;
-			double _double_scaleFactor = 0;
-
-			for (unsigned int i = 0; i < _mDouble_weightIndex.length(); ++i) {
-				if (!_bool_lockedJoints[i]) {
-					double w = _mDouble_weightIndex[i];
-					if (w >= _double_maxWeight_data) {
-						_int_maxIndex = i;
-						_double_maxWeight_data = w;
-					}
-					if (w <= _double_minWeight_data) {
-						_int_minIndex = i;
-						_double_minWeight_data = w;
-					}
-				}
-			}
-
-			for (unsigned int i = 0; i < _mDouble_weightIndex.length(); ++i) {
-				if (!_bool_lockedJoints[i]) {
-					if (i == _int_maxIndex) {
-					}
-					else if (i == _int_minIndex) {
-					}
-					else {
-						double w = _mDouble_weightIndex[i];
-						_double_otherWeight_data += w;
-					}
-				}
-			}
-
-			_double_maxWeight_new = _double_maxWeight_data + (1.0 - _double_maxWeight_data) * _mValue;
-			_double_minWeight_new = _double_minWeight_data * (1.0 - _mValue);
-
-			if (_double_otherWeight_data > 0) {
-				_double_scaleFactor = (1.0 - (_double_maxWeight_new + _double_minWeight_new)) / _double_otherWeight_data;
-			}
-			else {
-				_double_scaleFactor = 1.0;
-			}
-
-			for (unsigned int i = 0; i < _mDouble_weightIndex.length(); ++i) {
-				if (!_bool_lockedJoints[i]) {
-					if (i == _int_maxIndex) {
-						_mDouble_weightIndex[i] = _double_maxWeight_new;
-					}
-					else if (i == _int_minIndex) {
-						_mDouble_weightIndex[i] = _double_minWeight_new;
-					}
-					else {
-						_mDouble_weightIndex[i] = _mDouble_weightIndex[i] * _double_scaleFactor;
-					}
-				}
-			}
-		}
-
-		// ============================================== //
-		// ============================================== //
-		// ============================================== //
-		// Step 06 - Clean-up
-		// ============================================== //
-		// ============================================== //
-		// ============================================== //
-
-		fuck.normalizeWeights(_mDouble_weightIndex, _bool_lockedJoints, 1e-6, _mDecimal, _mPrune, _mInfluence);
-
-		// ============================================== //
-		// ============================================== //
-		// ============================================== //
-		// Step 07 - Return
-		// ============================================== //
-		// ============================================== //
-		// ============================================== //
-
-		for (unsigned int i = 0; i < _mDouble_weightIndex.length(); ++i) {
-			double _double_final = _mDouble_weightIndex[i];
-			_mDouble_weightFinal_redo.append(_double_final);
-		}
+	// Read the file
+	std::ifstream file("D:/3D World/Offline_Gacha_Game/scenes/meshSkinDict_ST.txt");
+	if (!file) {
+		MGlobal::displayError("Failed to open skin weight file.");
+		return MS::kFailure;
 	}
+
+	// Convert to string, and parse JSON
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+	std::string fileContent = buffer.str();
+
+	// Replace single quotes with double quotes to make it valid JSON
+	std::replace(fileContent.begin(), fileContent.end(), '\'', '\"');
+
+	// Parse JSON
+	json weightData = json::parse(fileContent);
+
+	// Access weights for the current object
+	std::vector<double> weights = weightData[meshName];
+
+	// Convert to MDoubleArray
+	MDoubleArray mWeights;
+	for (double val : weights) {
+		mWeights.append(val);
+	}
+
+
+
+
+
+	_mFnSkinCluster.setWeights(_mDagPath_objectShape,
+		_mObject_currentVertexComponent_all,
+		_mInt_jointIndex,
+		mWeights,
+		false);
+
+
+
+
+
+
+
+
+
+
 	return (redoIt());
 }
 
-MStatus sharperSkin::redoIt() {
-	_mFnSkinCluster.setWeights(_mDagPath_objectShape,
-		_mObject_currentVertexComponent_all,
-		_mInt_jointIndex,
-		_mDouble_weightFinal_redo,
-		false);
+MStatus importSkin::redoIt() {
 	return (MS::kSuccess);
 }
 
-MStatus sharperSkin::undoIt() {
-	_mFnSkinCluster.setWeights(_mDagPath_objectShape,
-		_mObject_currentVertexComponent_all,
-		_mInt_jointIndex,
-		_mDouble_weightData_allSelected,
-		false);
+MStatus importSkin::undoIt() {
 	return (MS::kSuccess);
 }

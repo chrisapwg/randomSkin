@@ -79,6 +79,7 @@ MStatus addSkin::doIt(const MArgList& args) {
 	_mValue = _mArgData_syntax.flagArgumentDouble(_flagValue[0], 0);
 	_mInfluence = _mArgData_syntax.flagArgumentInt(_flagInfluence[0], 0);
 	_mPrune = _mArgData_syntax.flagArgumentDouble(_flagPrune[0], 0);
+	int _mDecimal = fuck.getDecimal(_mPrune);
 
 	MString _mString_jointListStr;
 	MStringArray _mStringArray_jointNames;
@@ -194,6 +195,11 @@ MStatus addSkin::doIt(const MArgList& args) {
 		}
 	}
 
+	// ----- Find _mvalue update -----
+
+	int _length = _vector_jointIndex.size();
+	_mValue /= _length;
+
 	// ----- Looping per Selected Vertex List -----
 	
 	for (unsigned int a = 0; a < _mInt_vertexIndices_all.length(); ++a) {
@@ -242,20 +248,73 @@ MStatus addSkin::doIt(const MArgList& args) {
 		double _lockedPercent = 1.0 - _lockedSum;
 
 		if (_mValue != 0.0 && _lockedPercent != 0.0) {
-
-			MGlobal::displayInfo("Source Data = ");
-			fuck.printMDoubleArray("_mDouble_weightIndex", _mDouble_weightIndex);
-
-			for (int idx : _vector_jointIndex) {
-				if (idx >= 0 && idx < (int)_mDouble_weightIndex.length()) {
-					_mDouble_weightIndex[idx] += _mValue;
-					_bool_lockedJoints[idx] = true;
+			
+			// Step 1: Add _mValue to the target joints
+			double totalAdded = 0.0;
+			for (unsigned int i = 0; i < _int_jointLength; ++i) {
+				if (std::find(_vector_jointIndex.begin(), _vector_jointIndex.end(), i) != _vector_jointIndex.end()) {
+					_mDouble_weightIndex[i] += _mValue;
+					_bool_lockedJoints[i] = true;
+					if (_mDouble_weightIndex[i] > 1.0) _mDouble_weightIndex[i] = 1.0;
+					if (_mDouble_weightIndex[i] < 0.0) _mDouble_weightIndex[i] = 0.0;
 				}
 			}
 
-			MGlobal::displayInfo("After adding = ");
-			fuck.printMDoubleArray("_mDouble_weightIndex", _mDouble_weightIndex);
+			// Step 2: Normalize unlocked joints proportionally
+			double remainingSum = 0.0;
+			MIntArray _mInt_jointWithWeight;
+			for (unsigned int i = 0; i < _int_jointLength; ++i) {
+				if (std::find(_vector_jointIndex.begin(), _vector_jointIndex.end(), i) == _vector_jointIndex.end()) {
+					if (_mDouble_weightIndex[i] > _mPrune) {
+						_mInt_jointWithWeight.append(i);
+						remainingSum += _mDouble_weightIndex[i];
+					}
+				}
+			}
 
+			// Get locked sum too
+			double lockedSum = 0.0;
+			for (int idx : _vector_jointIndex) {
+				lockedSum += _mDouble_weightIndex[idx];
+			}
+
+			// Total current weight
+			double totalWeight = lockedSum + remainingSum;
+
+			// Step 3: Scale remaining joints proportionally to fill up to 1.0
+			double remainingTarget = (totalWeight > 1.0) ? (1.0 - lockedSum) : (1.0 - lockedSum);
+			for (unsigned int i = 0; i < _mInt_jointWithWeight.length(); ++i) {
+				int idx = _mInt_jointWithWeight[i];
+				double original = _mDouble_weightIndex[idx];
+				double scaled = (remainingSum > 0.0) ? (original * remainingTarget / remainingSum) : 0.0;
+				_mDouble_weightIndex[idx] = (scaled > _mPrune) ? scaled : 0.0;
+			}
+
+			// Recompute total after adjust
+			double _total = 0.0;
+			for (unsigned int i = 0; i < _int_jointLength; ++i) {
+				_total += _mDouble_weightIndex[i];
+			}
+
+			// Step 4: If still > 1.0, proportionally reduce the locked joints
+			if (_total > 1.0) {
+				double excess = _total - 1.0;
+
+				// Get lockedSum again (in case something changed)
+				lockedSum = 0.0;
+				for (int idx : _vector_jointIndex) {
+					lockedSum += _mDouble_weightIndex[idx];
+				}
+
+				if (lockedSum > 0.0) {
+					for (int idx : _vector_jointIndex) {
+						double w = _mDouble_weightIndex[idx];
+						double ratio = w / lockedSum;
+						double reduction = ratio * excess;
+						_mDouble_weightIndex[idx] = std::max(0.0, w - reduction);
+					}
+				}
+			}
 		}
 
 		// ============================================== //
@@ -266,10 +325,8 @@ MStatus addSkin::doIt(const MArgList& args) {
 		// ============================================== //
 		// ============================================== //
 
-		fuck.normalizeWeights(_mDouble_weightIndex, _bool_lockedJoints, 1e-6, 5, _mPrune, _mInfluence);
+		fuck.normalizeWeights(_mDouble_weightIndex, _bool_lockedJoints, 1e-6, _mDecimal, _mPrune, _mInfluence);
 
-		MGlobal::displayInfo("After Normalize = ");
-		fuck.printMDoubleArray("_mDouble_weightIndex", _mDouble_weightIndex);
 		// ============================================== //
 		// ============================================== //
 		// ============================================== //

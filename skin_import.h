@@ -29,10 +29,21 @@
 #include <maya/MItMeshPolygon.h>
 #include <maya/MItMeshEdge.h>
 
-class scaleSkin : public MPxCommand {
+#include <maya/MArrayDataHandle.h>
+#include <maya/MObjectArray.h>
+#include <maya/MFnDoubleArrayData.h>
+#include <maya/MFnIntArrayData.h>
+
+#include <iomanip>
+#include <fstream>
+#include <sstream>
+#include "json.hpp"
+using json = nlohmann::json;
+
+class importSkin : public MPxCommand {
 public: // Public so can used in main.cpp
-	scaleSkin();
-	virtual ~scaleSkin();
+	importSkin();
+	virtual ~importSkin();
 	virtual MStatus doIt(const MArgList& args) override;
 	virtual MStatus redoIt() override;
 	virtual MStatus undoIt() override;
@@ -50,8 +61,6 @@ private: // Only The doIt .cpp can read this
 	// ======================//
 
 	bool _mIsUndoable;
-	double _mValue;
-	unsigned int _mInfluence;
 	double _mPrune;
 
 	// ======================//
