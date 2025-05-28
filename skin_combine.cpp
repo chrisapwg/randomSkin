@@ -1,29 +1,21 @@
-#include "skin_import.h"
+#include "skin_combine.h"
 #include "common_skin.h"
 
 // ============================================== //
 // Flag Statement
 // ============================================== //
 
-static const MString _commandName = "importSkin";
-static const char* _flagObjectSource[2] = { "-os", "-objectSource" };
-static const char* _flagObjectTarget[2] = { "-ot", "-objectTarget" };
-static const char* _flagLocationJoint[2] = { "-lj", "-locationJoint" };
-static const char* _flagLocationWeight[2] = { "-lw", "-locationWeight" };
-static const char* _flagNameFind[2] = { "-f", "-findRename" };
-static const char* _flagNameReplace[2] = { "-r", "-replaceRename" };
+static const MString _commandName = "combineSkin";
+static const char* _flagCutList[2] = { "-cl", "-cutList" };
+static const char* _flagPasteList[2] = { "-pl", "-pasteList" };
 static const char* _flagPrune[2] = { "-p", "-prune" };
 
-MSyntax importSkin::commandSyntax() {
+MSyntax combineSkin::commandSyntax() {
 	MSyntax syntax;
 	syntax.setObjectType(MSyntax::kSelectionList, 0);
 	syntax.useSelectionAsDefault(false);
-	syntax.addFlag(_flagObjectSource[0], _flagObjectSource[1], MSyntax::kString);
-	syntax.addFlag(_flagObjectTarget[0], _flagObjectTarget[1], MSyntax::kString);
-	syntax.addFlag(_flagLocationJoint[0], _flagLocationJoint[1], MSyntax::kString);
-	syntax.addFlag(_flagLocationWeight[0], _flagLocationWeight[1], MSyntax::kString);
-	syntax.addFlag(_flagNameFind[0], _flagNameFind[1], MSyntax::kString);
-	syntax.addFlag(_flagNameReplace[0], _flagNameReplace[1], MSyntax::kString);
+	syntax.addFlag(_flagCutList[0], _flagCutList[1], MSyntax::kString);
+	syntax.addFlag(_flagPasteList[0], _flagPasteList[1], MSyntax::kString);
 	syntax.addFlag(_flagPrune[0], _flagPrune[1], MSyntax::kDouble);
 	return (syntax);
 }
@@ -32,26 +24,26 @@ MSyntax importSkin::commandSyntax() {
 // Common Statement
 // ============================================== //
 
-importSkin::importSkin() : // Set default value, similar like python def(args, args, args):
+combineSkin::combineSkin() : // Set default value, similar like python def(args, args, args):
 	MPxCommand(),
 	_mIsUndoable(true),
 	_mPrune(0.0001)
 {
 }
 
-importSkin::~importSkin()
+combineSkin::~combineSkin()
 {
 }
 
-bool importSkin::isUndoable() const {
+bool combineSkin::isUndoable() const {
 	return (_mIsUndoable);
 }
 
-void* importSkin::creator() {
-	return (new importSkin());
+void* combineSkin::creator() {
+	return (new combineSkin());
 }
 
-MString importSkin::commandName() {
+MString combineSkin::commandName() {
 	return (_commandName);
 }
 
@@ -59,7 +51,7 @@ MString importSkin::commandName() {
 // The Method
 // ============================================== //
 
-MStatus importSkin::doIt(const MArgList& args) {
+MStatus combineSkin::doIt(const MArgList& args) {
 	// ============================================== //
 	// ============================================== //
 	// ============================================== //
@@ -83,12 +75,21 @@ MStatus importSkin::doIt(const MArgList& args) {
 	_mPrune = _mArgData_syntax.flagArgumentDouble(_flagPrune[0], 0);
 	int _mDecimal = fuck.getDecimal(_mPrune);
 
-	_mString_objectSource = _mArgData_syntax.flagArgumentString(_flagObjectSource[0], 0);
-	_mString_objectTarget = _mArgData_syntax.flagArgumentString(_flagObjectTarget[0], 0);
-	_mString_locationJoint = _mArgData_syntax.flagArgumentString(_flagLocationJoint[0], 0);
-	_mString_locationWeight = _mArgData_syntax.flagArgumentString(_flagLocationWeight[0], 0);
-	_mString_nameFind = _mArgData_syntax.flagArgumentString(_flagNameFind[0], 0);
-	_mString_nameReplace = _mArgData_syntax.flagArgumentString(_flagNameReplace[0], 0);
+	MString _mString_cutListStr;
+	MStringArray _mStringArray_cutNames;
+	MStringArray _mString_cutSplit;
+
+	_mString_cutListStr = _mArgData_syntax.flagArgumentString(_flagCutList[0], 0);
+	_mString_cutListStr.split(',', _mString_cutSplit);
+	_mStringArray_cutNames = _mString_cutSplit;
+
+	MString _mString_pasteListStr;
+	MStringArray _mStringArray_pasteNames;
+	MStringArray _mString_pasteSplit;
+
+	_mString_pasteListStr = _mArgData_syntax.flagArgumentString(_flagPasteList[0], 0);
+	_mString_pasteListStr.split(',', _mString_pasteSplit);
+	_mStringArray_pasteNames = _mString_pasteSplit;
 
 	// ============================================== //
 	// ============================================== //
@@ -131,11 +132,6 @@ MStatus importSkin::doIt(const MArgList& args) {
 	std::vector<bool> _bool_lockedJoints;
 	_bool_lockedJoints.resize(_int_jointLength, false);
 
-	for (unsigned int i = 0; i < _int_jointLength; ++i) {
-		MPlug _plug = _mPlug_lockWeightsPlug.elementByLogicalIndex(i);
-		_bool_lockedJoints[i] = _plug.asBool();
-	}
-
 	// ----- Default Indicate -----
 
 	for (unsigned int p = 0; p < _int_jointLength; ++p) {
@@ -164,89 +160,110 @@ MStatus importSkin::doIt(const MArgList& args) {
 	_MFnSingleIndexedComponent_all.getElements(_mInt_vertexIndices_all);
 	_mFnSkinCluster.getWeights(_mDagPath_objectShape, _mObject_currentVertexComponent_all, _mDouble_weightData_allSelected, _int_jointLength);	// Step 3: Get all neighbor weights in one call
 
-	// ============================================== //
-	// ============================================== //
-	// ============================================== //
-	// Step 02 - Return
-	// ============================================== //
-	// ============================================== //
-	// ============================================== //
+	// ----- Convert Cut and Paste list into Index -----
 
-	MString _mString_objectName = _mDagPath_objectShape.partialPathName();
-	std::string _objectSource = _mString_objectSource.asChar();
-	std::string _objectTarget = _mString_objectTarget.asChar();
-	std::string _locationJoint = _mString_locationJoint.asChar();
-	std::string _locationWeight = _mString_locationWeight.asChar();
+	// Cut List
+	std::vector<int> _vector_cutIndex;
 
-	//
-	// --- Read Joint File ---
-	//
+	for (unsigned int i = 0; i < _mStringArray_cutNames.length(); ++i) {
+		MString _mString_jointNameCurrent = _mStringArray_cutNames[i];
+		int _foundIndex = -1;
 
-	std::ifstream fileJoint(_locationJoint);
-	std::stringstream bufferJoint;
-	bufferJoint << fileJoint.rdbuf();
-	std::string fileContentJoint = bufferJoint.str();
-	std::replace(fileContentJoint.begin(), fileContentJoint.end(), '\'', '\"');    	// Replace single quotes with double quotes to make it valid JSON
-	json jointsData = json::parse(fileContentJoint);                            	// Parse JSON
-	std::vector<std::string> jointsList = jointsData[_objectSource];                	// Access joints for the current object
+		for (unsigned int j = 0; j < _mDagPathArray_joint.length(); ++j) {
+			MFnDependencyNode _fnJoint(_mDagPathArray_joint[j].node());
+			MString _influenceName = _fnJoint.name();
 
-	//
-	// --- Read Weight File ---
-	//
-
-	std::ifstream fileWeight(_locationWeight);
-	std::stringstream bufferWeight;
-	bufferWeight << fileWeight.rdbuf();
-	std::string fileContentWeight = bufferWeight.str();
-	std::replace(fileContentWeight.begin(), fileContentWeight.end(), '\'', '\"');	// Replace single quotes with double quotes to make it valid JSON
-	json weightData = json::parse(fileContentWeight);                            	// Parse JSON
-	std::vector<double> weightsList = weightData[_objectSource];                    	// Access weights for the current object
-
-	//
-	// --- Convert to MVariable ---
-	//
-
-	for (int j = 0; j < _mInt_jointIndex.length(); ++j) {
-		MString _jntSource = _mDagPathArray_joint[j].partialPathName();
-		int _value = -1;
-		for (unsigned int f = 0; f < jointsList.size(); ++f) {
-			MString _jntFile = jointsList[f].c_str();
-			_jntFile.substitute(_mString_nameFind, _mString_nameReplace);
-			if (_jntSource == _jntFile) {
-				_value = f;
+			if (_mString_jointNameCurrent == _influenceName) {
+				_foundIndex = static_cast<int>(j);
 				break;
 			}
 		}
-		_mInt_jointIndex_new.append(_value);
+
+		if (_foundIndex != -1) {
+			_vector_cutIndex.push_back(_foundIndex);
+		}
 	}
 
-	//
-	// --- Convert to MDoubleArray ---
-	//
+	// Paste List
+	std::vector<int> _vector_pasteIndex;
 
-	//for (double val : weightsList) {
-	//	_mDouble_weightFinal_redo.append(val);
-	//}
+	for (unsigned int i = 0; i < _mStringArray_pasteNames.length(); ++i) {
+		MString _mString_jointNameCurrent = _mStringArray_pasteNames[i];
+		int _foundIndex = -1;
+
+		for (unsigned int j = 0; j < _mDagPathArray_joint.length(); ++j) {
+			MFnDependencyNode _fnJoint(_mDagPathArray_joint[j].node());
+			MString _influenceName = _fnJoint.name();
+
+			if (_mString_jointNameCurrent == _influenceName) {
+				_foundIndex = static_cast<int>(j);
+				break;
+			}
+		}
+
+		if (_foundIndex != -1) {
+			_vector_pasteIndex.push_back(_foundIndex);
+		}
+	}
 
 	// ----- Looping per Selected Vertex List -----
 
 	for (unsigned int a = 0; a < _mInt_vertexIndices_all.length(); ++a) {
-		for (int j = 0; j < _mInt_jointIndex_new.length(); ++j) {
-			double _weight;
-			if (_mInt_jointIndex_new[j] == -1) {
-				_weight = 0.0;
-			}
-			else {
-				_weight = weightsList[_mInt_vertexIndices_all[a] * jointsList.size() + _mInt_jointIndex_new[j]];
-			}
-			_mDouble_weightFinal_redo.append(_weight);
+
+		// ----- Reset Data -----
+
+		MDoubleArray _mDouble_weightIndex;
+
+
+		// ============================================== //
+		// ============================================== //
+		// ============================================== //
+		// Step 03 - Get Array Data for Listing
+		// ============================================== //
+		// ============================================== //
+		// ============================================== //
+
+		// ----- Search and Find index weight -----
+
+		for (unsigned int z = 0; z < _int_jointLength; ++z) {
+			_mDouble_weightIndex.append(_mDouble_weightData_allSelected[a * _int_jointLength + z]);
+		}
+
+		for (unsigned int z = 0; z < _vector_cutIndex.size(); ++z) {
+			double _cut = _mDouble_weightIndex[_vector_cutIndex[z]];
+			double _paste = _mDouble_weightIndex[_vector_pasteIndex[z]];
+
+			_mDouble_weightIndex[_vector_pasteIndex[z]] = _cut + _paste;
+			_mDouble_weightIndex[_vector_cutIndex[z]] = 0.0;
+		}
+
+		// ============================================== //
+		// ============================================== //
+		// ============================================== //
+		// Step 04 - Clean-up
+		// ============================================== //
+		// ============================================== //
+		// ============================================== //
+
+		fuck.normalizeWeights(_mDouble_weightIndex, _bool_lockedJoints, 1e-6, _mDecimal, _mPrune, 0);
+
+		// ============================================== //
+		// ============================================== //
+		// ============================================== //
+		// Step 05 - Return
+		// ============================================== //
+		// ============================================== //
+		// ============================================== //
+
+		for (unsigned int i = 0; i < _mDouble_weightIndex.length(); ++i) {
+			double _double_final = _mDouble_weightIndex[i];
+			_mDouble_weightFinal_redo.append(_double_final);
 		}
 	}
-
 	return (redoIt());
 }
 
-MStatus importSkin::redoIt() {
+MStatus combineSkin::redoIt() {
 	_mFnSkinCluster.setWeights(_mDagPath_objectShape,
 		_mObject_currentVertexComponent_all,
 		_mInt_jointIndex,
@@ -255,7 +272,7 @@ MStatus importSkin::redoIt() {
 	return (MS::kSuccess);
 }
 
-MStatus importSkin::undoIt() {
+MStatus combineSkin::undoIt() {
 	_mFnSkinCluster.setWeights(_mDagPath_objectShape,
 		_mObject_currentVertexComponent_all,
 		_mInt_jointIndex,

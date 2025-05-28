@@ -1,22 +1,24 @@
-#include "skin_sharper.h"
+#include "skin_brushScale.h"
 #include "common_skin.h"
 
 // ============================================== //
 // Flag Statement
 // ============================================== //
 
-static const MString _commandName = "sharperSkin";
-static const char* _flagValue[2] = { "-v", "-value" };
-static const char* _flagLoop[2] = { "-l", "-loop" };
+static const MString _commandName = "brushScale";
+//static const char* _flagValue[2] = { "-v", "-value" };
+static const char* _flagValueList[2] = { "-vl", "-valueList" };
+static const char* _flagJointList[2] = { "-jl", "-jointList" };
 static const char* _flagInfluence[2] = { "-im", "-influenceMax" };
 static const char* _flagPrune[2] = { "-p", "-prune" };
 
-MSyntax sharperSkin::commandSyntax() {
+MSyntax brushScale::commandSyntax() {
     MSyntax syntax;
     syntax.setObjectType(MSyntax::kSelectionList, 0);
     syntax.useSelectionAsDefault(false);
-    syntax.addFlag(_flagValue[0], _flagValue[1], MSyntax::kDouble);
-    syntax.addFlag(_flagLoop[0], _flagLoop[1], MSyntax::kLong);
+    //syntax.addFlag(_flagValue[0], _flagValue[1], MSyntax::kDouble);
+    syntax.addFlag(_flagValueList[0], _flagValueList[1], MSyntax::kString);
+    syntax.addFlag(_flagJointList[0], _flagJointList[1], MSyntax::kString);
     syntax.addFlag(_flagInfluence[0], _flagInfluence[1], MSyntax::kLong);
     syntax.addFlag(_flagPrune[0], _flagPrune[1], MSyntax::kDouble);
     return (syntax);
@@ -26,29 +28,28 @@ MSyntax sharperSkin::commandSyntax() {
 // Common Statement
 // ============================================== //
 
-sharperSkin::sharperSkin() : // Set default value, similar like python def(args, args, args):
+brushScale::brushScale() : // Set default value, similar like python def(args, args, args):
     MPxCommand(),
     _mIsUndoable(true),
     _mValue(0.2),
-    _mLoop(5),
     _mInfluence(8),
     _mPrune(0.0001)
 {
 }
 
-sharperSkin::~sharperSkin()
+brushScale::~brushScale()
 {
 }
 
-bool sharperSkin::isUndoable() const {
+bool brushScale::isUndoable() const {
     return (_mIsUndoable);
 }
 
-void* sharperSkin::creator() {
-    return (new sharperSkin());
+void* brushScale::creator() {
+    return (new brushScale());
 }
 
-MString sharperSkin::commandName() {
+MString brushScale::commandName() {
     return (_commandName);
 }
 
@@ -56,7 +57,7 @@ MString sharperSkin::commandName() {
 // The Method
 // ============================================== //
 
-MStatus sharperSkin::doIt(const MArgList& args) {
+MStatus brushScale::doIt(const MArgList& args) {
     // ============================================== //
     // ============================================== //
     // ============================================== //
@@ -77,11 +78,35 @@ MStatus sharperSkin::doIt(const MArgList& args) {
 
     // ----- Get Flag Data -----
 
-    _mValue = _mArgData_syntax.flagArgumentDouble(_flagValue[0], 0);
-    _mLoop = _mArgData_syntax.flagArgumentInt(_flagLoop[0], 0);
+    //_mValue = _mArgData_syntax.flagArgumentDouble(_flagValue[0], 0);
     _mInfluence = _mArgData_syntax.flagArgumentInt(_flagInfluence[0], 0);
     _mPrune = _mArgData_syntax.flagArgumentDouble(_flagPrune[0], 0);
     int _mDecimal = fuck.getDecimal(_mPrune);
+
+    MString _mString_jointListStr;
+    MStringArray _mStringArray_jointNames;
+    MStringArray _mString_split;
+
+    _mString_jointListStr = _mArgData_syntax.flagArgumentString(_flagJointList[0], 0);
+    _mString_jointListStr.split(',', _mString_split);
+    _mStringArray_jointNames = _mString_split;
+
+    MString _mString_valueListStr;
+    MStringArray _mStringArray_valueList;
+    MStringArray _mString_valueSplit;
+    MDoubleArray _mDouble_weightList;
+
+    _mString_valueListStr = _mArgData_syntax.flagArgumentString(_flagValueList[0], 0);
+    _mString_valueListStr.split(',', _mString_valueSplit);
+    _mStringArray_valueList = _mString_valueSplit;
+
+    //MGlobal::displayInfo(MString("_mString_valueListStr = ") + _mString_valueListStr);
+    //fuck.printMStringArray("_mStringArray_valueList", _mStringArray_valueList);
+
+    for (unsigned int i = 0; i < _mStringArray_valueList.length(); ++i) {
+        double value = _mStringArray_valueList[i].asDouble();
+        _mDouble_weightList.append(value);
+    }
 
     // ============================================== //
     // ============================================== //
@@ -129,6 +154,8 @@ MStatus sharperSkin::doIt(const MArgList& args) {
         _bool_lockedJoints[i] = _plug.asBool();
     }
 
+    // ----- Default Indicate -----
+
     for (unsigned int p = 0; p < _int_jointLength; ++p) {
         _mInt_jointIndex.append(p);                                    	// Add the index of influence to the list
     }
@@ -163,13 +190,55 @@ MStatus sharperSkin::doIt(const MArgList& args) {
     // ============================================== //
     // ============================================== //
 
+    // ----- Find Index from Listed Joint -----
+
+    // Map joint names to their index in the skinCluster influence list
+    std::vector<int> _vector_jointIndex;
+
+    for (unsigned int i = 0; i < _mStringArray_jointNames.length(); ++i) {
+        MString _mString_jointNameCurrent = _mStringArray_jointNames[i];
+        int _foundIndex = -1;
+
+        for (unsigned int j = 0; j < _mDagPathArray_joint.length(); ++j) {
+            MFnDependencyNode _fnJoint(_mDagPathArray_joint[j].node());
+            MString _influenceName = _fnJoint.name();
+
+            if (_mString_jointNameCurrent == _influenceName) {
+                _foundIndex = static_cast<int>(j);
+                break;
+            }
+        }
+
+        if (_foundIndex != -1) {
+            _vector_jointIndex.push_back(_foundIndex);
+        }
+    }
+
+    // ----- Find _mvalue update -----
+
+    int _length = _vector_jointIndex.size();
+    _mValue /= _length;
+
     // ----- Looping per Selected Vertex List -----
 
     for (unsigned int a = 0; a < _mInt_vertexIndices_all.length(); ++a) {
 
         // ----- Reset Data -----
 
+        bool _bool_firstLoop = true;
+
         MDoubleArray _mDouble_weightIndex;
+        MDoubleArray _mDouble_weightNeighbor;
+        MDoubleArray _mDouble_weightAverage;
+        MDoubleArray _mDouble_weightFinal_data;
+
+        // ----- Find default value from each selected vertex -----
+
+        MFnSingleIndexedComponent _mFnComponent_vertexCurrent;
+        MObject _mObject_vertexCurrent = _mFnComponent_vertexCurrent.create(MFn::kMeshVertComponent);
+        MIntArray _mInt_vertexIndex;
+        _mInt_vertexIndex.append(_mInt_vertexIndices_all[a]);
+        _mFnComponent_vertexCurrent.addElements(_mInt_vertexIndex);
 
         // ============================================== //
         // ============================================== //
@@ -188,6 +257,7 @@ MStatus sharperSkin::doIt(const MArgList& args) {
         // ----- Calculating for Locked Joint -----
 
         double _lockedSum = 0.0;
+        double _mValue = _mDouble_weightList[a];
 
         for (unsigned int i = 0; i < _int_jointLength; ++i) {
             if (_bool_lockedJoints[i]) {
@@ -199,62 +269,70 @@ MStatus sharperSkin::doIt(const MArgList& args) {
 
         if (_mValue != 0.0 && _lockedPercent != 0.0) {
 
-            unsigned int _int_maxIndex = 0;
-            unsigned int _int_minIndex = 0;
-            double _double_maxWeight_data = 0;
-            double _double_minWeight_data = 0;
-            double _double_maxWeight_new;
-            double _double_minWeight_new;
-            double _double_otherWeight_data = 0;
-            double _double_scaleFactor = 0;
+            // Step 1: Add _mValue * current weight to the target joints
+            double totalAdded = 0.0;
+            for (unsigned int i = 0; i < _int_jointLength; ++i) {
+                if (std::find(_vector_jointIndex.begin(), _vector_jointIndex.end(), i) != _vector_jointIndex.end()) {
+                    double percent = (1.0 - _mDouble_weightIndex[i]) * _mValue;
+                    double oldWeight = _mDouble_weightIndex[i];
+                    double added = oldWeight + (oldWeight * percent);
+                    _mDouble_weightIndex[i] = added;
+                    totalAdded += added;
+                }
+            }
 
-            for (unsigned int i = 0; i < _mDouble_weightIndex.length(); ++i) {
-                if (!_bool_lockedJoints[i]) {
-                    double w = _mDouble_weightIndex[i];
-                    if (w >= _double_maxWeight_data) {
-                        _int_maxIndex = i;
-                        _double_maxWeight_data = w;
-                    }
-                    if (w <= _double_minWeight_data) {
-                        _int_minIndex = i;
-                        _double_minWeight_data = w;
+            // Step 2: Normalize unlocked joints proportionally
+            double remainingSum = 0.0;
+            MIntArray _mInt_jointWithWeight;
+            for (unsigned int i = 0; i < _int_jointLength; ++i) {
+                if (std::find(_vector_jointIndex.begin(), _vector_jointIndex.end(), i) == _vector_jointIndex.end()) {
+                    if (_mDouble_weightIndex[i] > _mPrune) {
+                        _mInt_jointWithWeight.append(i);
+                        remainingSum += _mDouble_weightIndex[i];
                     }
                 }
             }
 
-            for (unsigned int i = 0; i < _mDouble_weightIndex.length(); ++i) {
-                if (!_bool_lockedJoints[i]) {
-                    if (i == _int_maxIndex) {
-                    }
-                    else if (i == _int_minIndex) {
-                    }
-                    else {
-                        double w = _mDouble_weightIndex[i];
-                        _double_otherWeight_data += w;
-                    }
+            // Get locked sum too
+            double lockedSum = 0.0;
+            for (int idx : _vector_jointIndex) {
+                lockedSum += _mDouble_weightIndex[idx];
+            }
+
+            // Total current weight
+            double totalWeight = lockedSum + remainingSum;
+
+            // Step 3: Scale remaining joints proportionally to fill up to 1.0
+            double remainingTarget = (totalWeight > 1.0) ? (1.0 - lockedSum) : (1.0 - lockedSum);
+            for (unsigned int i = 0; i < _mInt_jointWithWeight.length(); ++i) {
+                int idx = _mInt_jointWithWeight[i];
+                double original = _mDouble_weightIndex[idx];
+                double scaled = (remainingSum > 0.0) ? (original * remainingTarget / remainingSum) : 0.0;
+                _mDouble_weightIndex[idx] = (scaled > _mPrune) ? scaled : 0.0;
+            }
+
+            // Recompute total after adjust
+            double _total = 0.0;
+            for (unsigned int i = 0; i < _int_jointLength; ++i) {
+                _total += _mDouble_weightIndex[i];
+            }
+
+            // Step 4: If still > 1.0, proportionally reduce the locked joints
+            if (_total > 1.0) {
+                double excess = _total - 1.0;
+
+                // Get lockedSum again (in case something changed)
+                lockedSum = 0.0;
+                for (int idx : _vector_jointIndex) {
+                    lockedSum += _mDouble_weightIndex[idx];
                 }
-            }
 
-            _double_maxWeight_new = _double_maxWeight_data + (1.0 - _double_maxWeight_data) * _mValue;
-            _double_minWeight_new = _double_minWeight_data * (1.0 - _mValue);
-
-            if (_double_otherWeight_data > 0) {
-                _double_scaleFactor = (1.0 - (_double_maxWeight_new + _double_minWeight_new)) / _double_otherWeight_data;
-            }
-            else {
-                _double_scaleFactor = 1.0;
-            }
-
-            for (unsigned int i = 0; i < _mDouble_weightIndex.length(); ++i) {
-                if (!_bool_lockedJoints[i]) {
-                    if (i == _int_maxIndex) {
-                        _mDouble_weightIndex[i] = _double_maxWeight_new;
-                    }
-                    else if (i == _int_minIndex) {
-                        _mDouble_weightIndex[i] = _double_minWeight_new;
-                    }
-                    else {
-                        _mDouble_weightIndex[i] = _mDouble_weightIndex[i] * _double_scaleFactor;
+                if (lockedSum > 0.0) {
+                    for (int idx : _vector_jointIndex) {
+                        double w = _mDouble_weightIndex[idx];
+                        double ratio = w / lockedSum;
+                        double reduction = ratio * excess;
+                        _mDouble_weightIndex[idx] = std::max(0.0, w - reduction);
                     }
                 }
             }
@@ -286,7 +364,7 @@ MStatus sharperSkin::doIt(const MArgList& args) {
     return (redoIt());
 }
 
-MStatus sharperSkin::redoIt() {
+MStatus brushScale::redoIt() {
     _mFnSkinCluster.setWeights(_mDagPath_objectShape,
         _mObject_currentVertexComponent_all,
         _mInt_jointIndex,
@@ -295,7 +373,7 @@ MStatus sharperSkin::redoIt() {
     return (MS::kSuccess);
 }
 
-MStatus sharperSkin::undoIt() {
+MStatus brushScale::undoIt() {
     _mFnSkinCluster.setWeights(_mDagPath_objectShape,
         _mObject_currentVertexComponent_all,
         _mInt_jointIndex,

@@ -13,6 +13,9 @@
 #include "skin_export.h"
 #include "skin_import.h"
 #include "skin_copy.h"
+#include "skin_combine.h"
+#include "skin_brushRelax.h"
+#include "skin_brushSharper.h"
 
 MStatus initializePlugin(MObject pluginObj)
 {
@@ -40,6 +43,9 @@ MStatus initializePlugin(MObject pluginObj)
 	status = pluginFn.registerCommand(exportSkin::commandName(), exportSkin::creator, exportSkin::commandSyntax);
 	status = pluginFn.registerCommand(importSkin::commandName(), importSkin::creator, importSkin::commandSyntax);
 	status = pluginFn.registerCommand(copySkin::commandName(), copySkin::creator, copySkin::commandSyntax);
+	status = pluginFn.registerCommand(combineSkin::commandName(), combineSkin::creator, combineSkin::commandSyntax);
+	status = pluginFn.registerCommand(brushRelax::commandName(), brushRelax::creator, brushRelax::commandSyntax);
+	status = pluginFn.registerCommand(brushSharper::commandName(), brushSharper::creator, brushSharper::commandSyntax);
 
 	/*
 	status = pluginFn.registerCommand(helloWorldCMD::commandName(), helloWorldCMD::creator); // using () mean is operating and return something, if def with () mean just give the function adress
@@ -100,6 +106,9 @@ MStatus uninitializePlugin(MObject pluginObj)
 	status = pluginFn.deregisterCommand(exportSkin::commandName());
 	status = pluginFn.deregisterCommand(importSkin::commandName());
 	status = pluginFn.deregisterCommand(copySkin::commandName());
+	status = pluginFn.deregisterCommand(combineSkin::commandName());
+	status = pluginFn.deregisterCommand(brushRelax::commandName());
+	status = pluginFn.deregisterCommand(brushSharper::commandName());
 	/*
 	status = pluginFn.deregisterCommand(helloWorldCMD::commandName());
 	if (!status)

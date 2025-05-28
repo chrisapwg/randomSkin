@@ -8,10 +8,12 @@
 #include <maya/MDoubleArray.h>
 #include <map>
 #include <vector>
+#include <iostream>
 #include <algorithm>
 #include <numeric>
 #include <set>
 #include <unordered_map>
+#include <cctype>
 
 #include <maya/MSelectionList.h>
 #include <maya/MItSelectionList.h>
@@ -68,6 +70,12 @@ private: // Only The doIt .cpp can read this
 	MFnSingleIndexedComponent _MFnSingleIndexedComponent_all;
 	MObject _mObject_currentVertexComponent_all = _MFnSingleIndexedComponent_all.create(MFn::kMeshVertComponent);
 
+	MFnSingleIndexedComponent _MFnSingleIndexedComponent_grown;
+	MObject _mObject_currentVertexComponent_grown = _MFnSingleIndexedComponent_grown.create(MFn::kMeshVertComponent);
+
 	MDoubleArray _mDouble_weightData_allSelected;
+	MDoubleArray _mDouble_weightData_allWithNeighbor;
 	MDoubleArray _mDouble_weightFinal_redo;
 };
+
+

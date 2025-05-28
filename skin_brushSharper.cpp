@@ -1,21 +1,23 @@
-#include "skin_sharper.h"
+#include "skin_brushSharper.h"
 #include "common_skin.h"
 
 // ============================================== //
 // Flag Statement
 // ============================================== //
 
-static const MString _commandName = "sharperSkin";
-static const char* _flagValue[2] = { "-v", "-value" };
+static const MString _commandName = "brushSharper";
+//static const char* _flagValue[2] = { "-v", "-value" };
+static const char* _flagValueList[2] = { "-vl", "-valueList" };
 static const char* _flagLoop[2] = { "-l", "-loop" };
 static const char* _flagInfluence[2] = { "-im", "-influenceMax" };
 static const char* _flagPrune[2] = { "-p", "-prune" };
 
-MSyntax sharperSkin::commandSyntax() {
+MSyntax brushSharper::commandSyntax() {
     MSyntax syntax;
     syntax.setObjectType(MSyntax::kSelectionList, 0);
     syntax.useSelectionAsDefault(false);
-    syntax.addFlag(_flagValue[0], _flagValue[1], MSyntax::kDouble);
+    //syntax.addFlag(_flagValue[0], _flagValue[1], MSyntax::kDouble);
+    syntax.addFlag(_flagValueList[0], _flagValueList[1], MSyntax::kString);
     syntax.addFlag(_flagLoop[0], _flagLoop[1], MSyntax::kLong);
     syntax.addFlag(_flagInfluence[0], _flagInfluence[1], MSyntax::kLong);
     syntax.addFlag(_flagPrune[0], _flagPrune[1], MSyntax::kDouble);
@@ -26,29 +28,29 @@ MSyntax sharperSkin::commandSyntax() {
 // Common Statement
 // ============================================== //
 
-sharperSkin::sharperSkin() : // Set default value, similar like python def(args, args, args):
+brushSharper::brushSharper() : // Set default value, similar like python def(args, args, args):
     MPxCommand(),
     _mIsUndoable(true),
-    _mValue(0.2),
+    //_mValue(0.2),
     _mLoop(5),
     _mInfluence(8),
     _mPrune(0.0001)
 {
 }
 
-sharperSkin::~sharperSkin()
+brushSharper::~brushSharper()
 {
 }
 
-bool sharperSkin::isUndoable() const {
+bool brushSharper::isUndoable() const {
     return (_mIsUndoable);
 }
 
-void* sharperSkin::creator() {
-    return (new sharperSkin());
+void* brushSharper::creator() {
+    return (new brushSharper());
 }
 
-MString sharperSkin::commandName() {
+MString brushSharper::commandName() {
     return (_commandName);
 }
 
@@ -56,7 +58,7 @@ MString sharperSkin::commandName() {
 // The Method
 // ============================================== //
 
-MStatus sharperSkin::doIt(const MArgList& args) {
+MStatus brushSharper::doIt(const MArgList& args) {
     // ============================================== //
     // ============================================== //
     // ============================================== //
@@ -77,11 +79,28 @@ MStatus sharperSkin::doIt(const MArgList& args) {
 
     // ----- Get Flag Data -----
 
-    _mValue = _mArgData_syntax.flagArgumentDouble(_flagValue[0], 0);
+    //_mValue = _mArgData_syntax.flagArgumentDouble(_flagValue[0], 0);
     _mLoop = _mArgData_syntax.flagArgumentInt(_flagLoop[0], 0);
     _mInfluence = _mArgData_syntax.flagArgumentInt(_flagInfluence[0], 0);
     _mPrune = _mArgData_syntax.flagArgumentDouble(_flagPrune[0], 0);
     int _mDecimal = fuck.getDecimal(_mPrune);
+
+    MString _mString_valueListStr;
+    MStringArray _mStringArray_valueList;
+    MStringArray _mString_valueSplit;
+    MDoubleArray _mDouble_weightList;
+
+    _mString_valueListStr = _mArgData_syntax.flagArgumentString(_flagValueList[0], 0);
+    _mString_valueListStr.split(',', _mString_valueSplit);
+    _mStringArray_valueList = _mString_valueSplit;
+
+    //MGlobal::displayInfo(MString("_mString_valueListStr = ") + _mString_valueListStr);
+    //fuck.printMStringArray("_mStringArray_valueList", _mStringArray_valueList);
+
+    for (unsigned int i = 0; i < _mStringArray_valueList.length(); ++i) {
+        double value = _mStringArray_valueList[i].asDouble();
+        _mDouble_weightList.append(value);
+    }
 
     // ============================================== //
     // ============================================== //
@@ -196,6 +215,7 @@ MStatus sharperSkin::doIt(const MArgList& args) {
         }
 
         double _lockedPercent = 1.0 - _lockedSum;
+        double _mValue = _mDouble_weightList[a];
 
         if (_mValue != 0.0 && _lockedPercent != 0.0) {
 
@@ -286,7 +306,7 @@ MStatus sharperSkin::doIt(const MArgList& args) {
     return (redoIt());
 }
 
-MStatus sharperSkin::redoIt() {
+MStatus brushSharper::redoIt() {
     _mFnSkinCluster.setWeights(_mDagPath_objectShape,
         _mObject_currentVertexComponent_all,
         _mInt_jointIndex,
@@ -295,7 +315,7 @@ MStatus sharperSkin::redoIt() {
     return (MS::kSuccess);
 }
 
-MStatus sharperSkin::undoIt() {
+MStatus brushSharper::undoIt() {
     _mFnSkinCluster.setWeights(_mDagPath_objectShape,
         _mObject_currentVertexComponent_all,
         _mInt_jointIndex,

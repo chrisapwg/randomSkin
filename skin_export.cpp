@@ -61,9 +61,9 @@ MStatus exportSkin::doIt(const MArgList& args) {
 
 	// ----- Get Command Data -----
 
-	MArgDatabase _mArgData_syntax(syntax(), args, &_status);						// Collect semua syntax yang kita set di maya cmds
-	MSelectionList _mSList_syntaxObject;											// Create array list of selected object
-	_mArgData_syntax.getObjects(_mSList_syntaxObject);								// Args ini object yang ada di awal "cmds.command([this is], args, args)", save ke '_mSList_syntaxObject'
+	MArgDatabase _mArgData_syntax(syntax(), args, &_status);                    	// Collect semua syntax yang kita set di maya cmds
+	MSelectionList _mSList_syntaxObject;                                        	// Create array list of selected object
+	_mArgData_syntax.getObjects(_mSList_syntaxObject);                            	// Args ini object yang ada di awal "cmds.command([this is], args, args)", save ke '_mSList_syntaxObject'
 	MItSelectionList _MItSList_listVertex(_mSList_syntaxObject, MFn::kComponent);	// Specify the object to be component exp: vertex, edge, face
 
 	// ----- Get Flag Data -----
@@ -96,21 +96,21 @@ MStatus exportSkin::doIt(const MArgList& args) {
 
 	MObject _mObject_currentVertexComponent;
 	_MItSList_listVertex.getDagPath(_mDagPath_objectShape, _mObject_currentVertexComponent);	// Get the dagPath (true|path|nameShape) and component Index
-	_mDagPath_objectShape.extendToShape();														// Make sure to select the 'Shape'
+	_mDagPath_objectShape.extendToShape();                                                    	// Make sure to select the 'Shape'
 
 	MObject _mObject_objectShape;
-	_mObject_objectShape = _mDagPath_objectShape.node();								// Convert the dagPath or now is shapeNode 'pSphereShape1', into MObject to do things
-	MItDependencyGraph _mItDG_objectInputSkinCluster(_mObject_objectShape,				// Find graph of this mObject
-		MFn::kSkinClusterFilter,			// Find specific object 'skinCluster'
-		MItDependencyGraph::kUpstream,		// Mean fiding the input, not output
+	_mObject_objectShape = _mDagPath_objectShape.node();                            	// Convert the dagPath or now is shapeNode 'pSphereShape1', into MObject to do things
+	MItDependencyGraph _mItDG_objectInputSkinCluster(_mObject_objectShape,            	// Find graph of this mObject
+		MFn::kSkinClusterFilter,        	// Find specific object 'skinCluster'
+		MItDependencyGraph::kUpstream,    	// Mean fiding the input, not output
 		MItDependencyGraph::kDepthFirst,	// Search the input of selected node loop until very deep
-		MItDependencyGraph::kPlugLevel,		// Make sure node 'plug' also get pemeriksaan, exp type 'inMesh.'
-		&_status);							// return MStatus to check
+		MItDependencyGraph::kPlugLevel,    	// Make sure node 'plug' also get pemeriksaan, exp type 'inMesh.'
+		&_status);                        	// return MStatus to check
 
-	_mObject_skinCluster = _mItDG_objectInputSkinCluster.currentItem();					// Convert the found node into MObject
-	_mFnSkinCluster.setObject(_mObject_skinCluster);									// Convert the found MObject into skinCluster
-	_mFnSkinCluster.influenceObjects(_mDagPathArray_joint, &_status);					// MDagPathArray _mDagPathArray_joint; Create dagPath but array, to list the joint
-	unsigned int _int_jointLength = _mDagPathArray_joint.length();						// Get the length of joint influence
+	_mObject_skinCluster = _mItDG_objectInputSkinCluster.currentItem();                	// Convert the found node into MObject
+	_mFnSkinCluster.setObject(_mObject_skinCluster);                                	// Convert the found MObject into skinCluster
+	_mFnSkinCluster.influenceObjects(_mDagPathArray_joint, &_status);                	// MDagPathArray _mDagPathArray_joint; Create dagPath but array, to list the joint
+	unsigned int _int_jointLength = _mDagPathArray_joint.length();                    	// Get the length of joint influence
 
 	// ----- Find Locked Joint -----
 
@@ -127,7 +127,7 @@ MStatus exportSkin::doIt(const MArgList& args) {
 	// ----- Default Indicate -----
 
 	for (unsigned int p = 0; p < _int_jointLength; ++p) {
-		_mInt_jointIndex.append(p);										// Add the index of influence to the list
+		_mInt_jointIndex.append(p);                                    	// Add the index of influence to the list
 	}
 
 	// ----- Collect Weight Data -----
@@ -172,3 +172,5 @@ MStatus exportSkin::redoIt() {
 MStatus exportSkin::undoIt() {
 	return (MS::kSuccess);
 }
+
+

@@ -1,21 +1,23 @@
-#include "skin_relax.h"
+#include "skin_brushRelax.h"
 #include "common_skin.h"
 
 // ============================================== //
 // Flag Statement
 // ============================================== //
 
-static const MString _commandName = "relaxSkin";
-static const char* _flagValue[2] = { "-v", "-value" };
+static const MString _commandName = "brushRelax";
+//static const char* _flagValue[2] = { "-v", "-value" };
+static const char* _flagValueList[2] = { "-vl", "-valueList" };
 static const char* _flagLoop[2] = { "-l", "-loop" };
 static const char* _flagInfluence[2] = { "-im", "-influenceMax" };
 static const char* _flagPrune[2] = { "-p", "-prune" };
 
-MSyntax relaxSkin::commandSyntax() {
+MSyntax brushRelax::commandSyntax() {
     MSyntax syntax;
     syntax.setObjectType(MSyntax::kSelectionList, 0);
     syntax.useSelectionAsDefault(false);
-    syntax.addFlag(_flagValue[0], _flagValue[1], MSyntax::kDouble);
+    //syntax.addFlag(_flagValue[0], _flagValue[1], MSyntax::kDouble);
+    syntax.addFlag(_flagValueList[0], _flagValueList[1], MSyntax::kString);
     syntax.addFlag(_flagLoop[0], _flagLoop[1], MSyntax::kLong);
     syntax.addFlag(_flagInfluence[0], _flagInfluence[1], MSyntax::kLong);
     syntax.addFlag(_flagPrune[0], _flagPrune[1], MSyntax::kDouble);
@@ -26,29 +28,29 @@ MSyntax relaxSkin::commandSyntax() {
 // Common Statement
 // ============================================== //
 
-relaxSkin::relaxSkin() : // Set default value, similar like python def(args, args, args):
+brushRelax::brushRelax() : // Set default value, similar like python def(args, args, args):
     MPxCommand(),
     _mIsUndoable(true),
-    _mValue(0.2),
+    //_mValue(0.2),
     _mLoop(5),
     _mInfluence(8),
     _mPrune(0.0001)
 {
 }
 
-relaxSkin::~relaxSkin()
+brushRelax::~brushRelax()
 {
 }
 
-bool relaxSkin::isUndoable() const {
+bool brushRelax::isUndoable() const {
     return (_mIsUndoable);
 }
 
-void* relaxSkin::creator() {
-    return (new relaxSkin());
+void* brushRelax::creator() {
+    return (new brushRelax());
 }
 
-MString relaxSkin::commandName() {
+MString brushRelax::commandName() {
     return (_commandName);
 }
 
@@ -56,7 +58,7 @@ MString relaxSkin::commandName() {
 // The Method
 // ============================================== //
 
-MStatus relaxSkin::doIt(const MArgList& args) {
+MStatus brushRelax::doIt(const MArgList& args) {
     // ============================================== //
     // ============================================== //
     // ============================================== //
@@ -77,11 +79,30 @@ MStatus relaxSkin::doIt(const MArgList& args) {
 
     // ----- Get Flag Data -----
 
-    _mValue = _mArgData_syntax.flagArgumentDouble(_flagValue[0], 0);
+    //_mValue = _mArgData_syntax.flagArgumentDouble(_flagValue[0], 0);
     _mLoop = _mArgData_syntax.flagArgumentInt(_flagLoop[0], 0);
     _mInfluence = _mArgData_syntax.flagArgumentInt(_flagInfluence[0], 0);
     _mPrune = _mArgData_syntax.flagArgumentDouble(_flagPrune[0], 0);
     int _mDecimal = fuck.getDecimal(_mPrune);
+
+    MString _mString_valueListStr;
+    MStringArray _mStringArray_valueList;
+    MStringArray _mString_valueSplit;
+    MDoubleArray _mDouble_weightList;
+
+    _mString_valueListStr = _mArgData_syntax.flagArgumentString(_flagValueList[0], 0);
+    _mString_valueListStr.split(',', _mString_valueSplit);
+    _mStringArray_valueList = _mString_valueSplit;
+
+    //MGlobal::displayInfo(MString("_mString_valueListStr = ") + _mString_valueListStr);
+    //fuck.printMStringArray("_mStringArray_valueList", _mStringArray_valueList);
+
+    for (unsigned int i = 0; i < _mStringArray_valueList.length(); ++i) {
+        double value = _mStringArray_valueList[i].asDouble();
+        _mDouble_weightList.append(value);
+    }
+
+    //fuck.printMDoubleArray("_mDouble_weightList", _mDouble_weightList);
 
     // ============================================== //
     // ============================================== //
@@ -216,6 +237,8 @@ MStatus relaxSkin::doIt(const MArgList& args) {
 
             // ----- Reset Data -----
 
+            bool _bool_firstLoop = true;
+
             MDoubleArray _mDouble_weightIndex;
             MDoubleArray _mDouble_weightNeighbor;
             MDoubleArray _mDouble_weightAverage;
@@ -247,6 +270,8 @@ MStatus relaxSkin::doIt(const MArgList& args) {
                 _mDouble_weightIndex.append(w);
             }
 
+            //fuck.printMDoubleArray("_mDouble_weightIndex", _mDouble_weightIndex);
+
             // ----- Calculating for Locked Joint -----
 
             double _lockedSum = 0.0;
@@ -258,6 +283,7 @@ MStatus relaxSkin::doIt(const MArgList& args) {
             }
 
             double _lockedPercent = 1.0 - _lockedSum;
+            double _mValue = _mDouble_weightList[a];
 
             if (_mValue != 0.0 && _lockedPercent != 0.0) {
 
@@ -358,7 +384,7 @@ MStatus relaxSkin::doIt(const MArgList& args) {
     return (redoIt());
 }
 
-MStatus relaxSkin::redoIt() {
+MStatus brushRelax::redoIt() {
     _mFnSkinCluster.setWeights(_mDagPath_objectShape,
         _mObject_currentVertexComponent_all,
         _mInt_jointIndex,
@@ -367,7 +393,7 @@ MStatus relaxSkin::redoIt() {
     return (MS::kSuccess);
 }
 
-MStatus relaxSkin::undoIt() {
+MStatus brushRelax::undoIt() {
     _mFnSkinCluster.setWeights(_mDagPath_objectShape,
         _mObject_currentVertexComponent_all,
         _mInt_jointIndex,
