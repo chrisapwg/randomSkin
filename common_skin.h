@@ -140,7 +140,7 @@ public:
 
         MGlobal::displayInfo(msg);
     }
-
+    /*
     void normalizeWeights(MDoubleArray& weights, std::vector<bool> lockedJoints, double epsilon = 0.0001, int decimals = 5, double prune = 0.001, unsigned int maxInfluence = 4) {
         MDoubleArray originalWeights = weights;  // Keep a copy for reference
         MDoubleArray prunedWeights(weights.length(), 0.0);
@@ -167,11 +167,10 @@ public:
                 unsigned int minIndex = -1;
 
                 for (unsigned int i = 0; i < weightVector.size(); ++i) {
-                    if (!lockedJoints[i]) {
-                        if (weightVector[i] > 0.0 && weightVector[i] < minWeight) {
+                    if (weightVector[i] > 0.0 && weightVector[i] < minWeight) {
+                        if (!lockedJoints[i]) {
                             minWeight = weightVector[i];
                             minIndex = i;
-                        }
                     }
                 }
 
@@ -226,4 +225,112 @@ public:
             }
         }
     }
+    */
+    void normalizeWeights(MDoubleArray& weights, std::vector<bool> lockedJoints, double epsilon = 0.0001, int decimals = 5, double prune = 0.001, unsigned int maxInfluence = 4) {
+        MDoubleArray originalWeights = weights;
+        MDoubleArray prunedWeights(weights.length(), 0.0);
+
+        // ----- Step 1: Prune small weights -----
+        for (unsigned int i = 0; i < weights.length(); ++i) {
+            if (lockedJoints[i] || weights[i] > prune || fabs(weights[i] - 1.0) < epsilon) {
+                prunedWeights[i] = weights[i];
+            }
+        }
+
+        // ----- Step 2: Limit max influences -----
+        if (maxInfluence != 0) {
+            std::vector<double> weightVector(prunedWeights.begin(), prunedWeights.end());
+
+            // Count locked weights > 0
+            unsigned int lockedCount = 0;
+            for (unsigned int i = 0; i < weightVector.size(); ++i) {
+                if (lockedJoints[i] && weightVector[i] > 0.0) {
+                    ++lockedCount;
+                }
+            }
+
+            // If locked weights already exceed max, skip pruning
+            if (lockedCount < maxInfluence) {
+                unsigned int allowedUnlocked = maxInfluence - lockedCount;
+
+                auto countUnlocked = [&]() {
+                    unsigned int count = 0;
+                    for (unsigned int i = 0; i < weightVector.size(); ++i) {
+                        if (!lockedJoints[i] && weightVector[i] > 0.0)
+                            ++count;
+                    }
+                    return count;
+                    };
+
+                // Prune smallest unlocked weights until within limit
+                while (countUnlocked() > allowedUnlocked) {
+                    double minWeight = std::numeric_limits<double>::max();
+                    int minIndex = -1;
+
+                    for (unsigned int i = 0; i < weightVector.size(); ++i) {
+                        if (!lockedJoints[i] && weightVector[i] > 0.0 && weightVector[i] < minWeight) {
+                            minWeight = weightVector[i];
+                            minIndex = i;
+                        }
+                    }
+
+                    if (minIndex == -1) {
+                        // Nothing left to remove
+                        break;
+                    }
+
+                    weightVector[minIndex] = 0.0;
+                    prunedWeights[minIndex] = 0.0;
+                }
+            }
+            // else: skip pruning because locked already consume all influence slots
+        }
+
+        // Copy pruned values back
+        weights = prunedWeights;
+        double sum = std::accumulate(weights.begin(), weights.end(), 0.0);
+
+        // ----- Step 3: Normalize -----
+        if (fabs(sum - 1.0) > epsilon && sum > 0.0) {
+            for (unsigned int i = 0; i < weights.length(); ++i) {
+                if (!lockedJoints[i]) {
+                    weights[i] /= sum;
+                }
+            }
+        }
+
+        // ----- Step 4: Round decimals -----
+        double factor = std::pow(10.0, decimals);
+        for (unsigned int i = 0; i < weights.length(); ++i) {
+            weights[i] = std::round(weights[i] * factor) / factor;
+        }
+
+        // ----- Step 5: Fix floating-point error -----
+        sum = std::accumulate(weights.begin(), weights.end(), 0.0);
+        double error = sum - 1.0;
+        if (fabs(error) > epsilon) {
+            int maxIndex = -1;
+            double maxValue = -1.0;
+
+            for (unsigned int i = 0; i < weights.length(); ++i) {
+                if (!lockedJoints[i] && weights[i] > maxValue) {
+                    maxValue = weights[i];
+                    maxIndex = i;
+                }
+            }
+
+            if (maxIndex >= 0) {
+                weights[maxIndex] -= error;
+            }
+        }
+
+        // ----- Step 6: Clamp values -----
+        for (unsigned int i = 0; i < weights.length(); ++i) {
+            if (!lockedJoints[i]) {
+                if (weights[i] < epsilon || weights[i] < 0.0) weights[i] = 0.0;
+                if (weights[i] > 1.0) weights[i] = 1.0;
+            }
+        }
+    }
+
 };

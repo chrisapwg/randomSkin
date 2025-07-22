@@ -146,7 +146,7 @@ MStatus setSkin::doIt(const MArgList& args) {
     // Collect data -----
     // "_mObject_currentVertexComponent_all"
     // "_mInt_vertexIndices_all"
-
+    
     for (; !_MItSList_listVertex.isDone(); _MItSList_listVertex.next()) {
         MObject _component;
         MDagPath _dagPath;
@@ -161,8 +161,8 @@ MStatus setSkin::doIt(const MArgList& args) {
 
     MIntArray _mInt_vertexIndices_all;
     _MFnSingleIndexedComponent_all.getElements(_mInt_vertexIndices_all);
-    _mFnSkinCluster.getWeights(_mDagPath_objectShape, _mObject_currentVertexComponent_all, _mDouble_weightData_allSelected, _int_jointLength);	// Step 3: Get all neighbor weights in one call
-
+    //_mFnSkinCluster.getWeights(_mDagPath_objectShape, _mObject_currentVertexComponent_all, _mDouble_weightData_allSelected, _int_jointLength);	// Step 3: Get all neighbor weights in one call
+    
     // ============================================== //
     // ============================================== //
     // ============================================== //
@@ -324,11 +324,9 @@ MStatus setSkin::doIt(const MArgList& args) {
         // ============================================== //
         // ============================================== //
         // ============================================== //
-
-        fuck.printMDoubleArray("_mDouble_weightIndex", _mDouble_weightIndex);
+        
         fuck.normalizeWeights(_mDouble_weightIndex, _bool_lockedJoints, 1e-6, _mDecimal, _mPrune, _mInfluence);
-        fuck.printMDoubleArray("_mDouble_weightIndex", _mDouble_weightIndex);
-
+        
         // ============================================== //
         // ============================================== //
         // ============================================== //
